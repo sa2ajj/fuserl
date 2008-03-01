@@ -1,0 +1,4 @@
+rescan for supported methods upon code_change
+
+ls -l /tmp/sux/Users/pmineiro works,
+  ls -l /tmp/sux/Users/pmineiro/tmp does not (readdir overflow problem?)

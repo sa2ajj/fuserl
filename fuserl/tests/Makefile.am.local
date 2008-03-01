@@ -1,0 +1,8 @@
+TESTS = 		\
+  module-fusehello	\
+  module-fusehelloasync
+
+EXTRA_DIST += 			\
+  fusehello.erl			\
+  fusehelloasync.erl		\
+  fusexmpfh.erl
