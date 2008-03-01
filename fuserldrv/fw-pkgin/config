@@ -40,3 +40,5 @@ FW_PACKAGE_BUILD_CONFLICTS=""
 # FW_PKGCONFIG_EXTRA=""
 
 FW_DUPLOAD_ARGS=${FW_DUPLOAD_ARGS-"-t myarchive"}
+
+FW_SUBVERSION_TAG_ROOT="https://fuserl.googlecode.com/svn/tags/fuserldrv"
