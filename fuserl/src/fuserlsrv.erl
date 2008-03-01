@@ -426,7 +426,11 @@ decode_request (<<?EMULATOR_REQUEST_LL:8,
     symlink -> symlink (Req, Ctx, Rest, FusErlSrvState);
     unlink -> unlink (Req, Ctx, Rest, FusErlSrvState);
     write -> write (Req, Ctx, Rest, FusErlSrvState)
-  end.
+  end;
+decode_request (X, FusErlSrvState) ->
+  % TODO: dispatch to Module handler
+  error_logger:error_msg ("fuserlsrv got unexpected data ~p~n", [ X ]),
+  { noreply, FusErlSrvState }.
 
 encode_opcode (lookup) -> fuserlcodec:encode_byte (?FUSERL_LL_LOOKUP);
 encode_opcode (forget) -> fuserlcodec:encode_byte (?FUSERL_LL_FORGET);
