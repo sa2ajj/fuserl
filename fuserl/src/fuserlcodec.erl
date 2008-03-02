@@ -186,8 +186,6 @@ encode_statvfs (StatVFS = #statvfs{}) ->
     encode_native_64_unsigned (StatVFS#statvfs.f_flag), 
     encode_native_64_unsigned (StatVFS#statvfs.f_namemax) ].
 
-encode_string (S) when is_binary (S) ->
-  Len = 1 + erlang:size (S),
-  [ <<Len:64/native-unsigned>>, S, <<0:8>> ];
 encode_string (S) ->
-  encode_string (erlang:iolist_to_binary (S)).
+  Len = 1 + erlang:iolist_size (S),
+  [ <<Len:64/native-unsigned>>, S, <<0:8>> ].
