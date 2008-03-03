@@ -84,10 +84,9 @@
 %% @doc Compute the byte size of a directory entry.
 %% @end
 
-dirent_size (#direntry{ name = Name }) when is_binary (Name) ->
-  (erlang:size (Name) + 7) band (bnot 7);
-dirent_size (#direntry{ name = Name }) when is_list (Name) ->
-  (erlang:length (Name) + 7) band (bnot 7).
+dirent_size (#direntry{ name = Name }) ->
+  TotalSize = 8 + 8 + 4 + 4 + erlang:iolist_size (Name),
+  (TotalSize + 7) band (bnot 7).
 
 %% @spec reply (Cont::continuation (), Info) -> ok
 %% @doc Complete an asynchronous operation.  Info is whatever
