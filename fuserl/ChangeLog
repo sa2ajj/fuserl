@@ -1,4 +1,4 @@
-Version 2.0.2 [NOT YET RELEASED]
+Version 2.0.2
   * Have encode_string work with iolists.
   * Fix dirent_size to agree with include/fuse_kernel.h
 
