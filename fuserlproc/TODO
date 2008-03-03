@@ -1,3 +1,5 @@
+mnesia:system_info and mnesia:table_info
+erlang:nodes
 monitor pids and clean up state table
 monitor ports and clean up state table
   no erlang:monitor for ports, but could create a seperate process 
