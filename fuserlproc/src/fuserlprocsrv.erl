@@ -35,7 +35,7 @@ start_link (LinkedIn, Dir) ->
 init ([]) ->
   State = #fuserlprocsrv{ inodes = gb_trees:from_orddict ([ { 4, [] } ]),
                           names = gb_trees:empty () },
-  % pre-alloc system info inodes
+  % cheesy: pre-alloc system info inodes
   { _, NewState } = readdir (void, 4, 100000, 0, void, void, State),
   { ok, NewState }.
 
