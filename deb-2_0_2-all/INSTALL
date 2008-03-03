@@ -1,0 +1,51 @@
+fuserl uses framewerk, which is basically a way to template automake.
+however you don't need to install framewerk to build from a dist tarball.
+it should behave just like a normal gnu automake/autoconf based project.
+
+that means, run 
+
+% ./configure --help
+
+to get tons of options, or just cross your fingers and type
+
+% ./configure && make && make install
+
+Some notes:
+
+* The default prefix is wherever fuserldrv was installed, if that can be 
+  found in the path, otherwise "/usr".  If you don't like that, make sure to 
+  use the --prefix configure option.
+        * If you chose a different prefix when installing fuserldrv, use 
+          application:set_env/3 with the fuserl application variable 
+          'fuserldrvprefix' to let the code know where to look.
+
+* You need a working Erlang installation.
+        * Ubuntu/Debian: aptitude install erlang
+        * OS/X (fink): apt-get install erlang-otp
+        * others: please let me know so i can update here
+
+* You need fusermount utility.
+        * Ubuntu/Debian: aptitude install fuse-utils
+        * OS/X (fink): apt-get install fuse
+        * OS/X (non fink): install the macfuse pkg
+
+* You need eunit to run the tests.  It's advised you run the tests if you 
+are installing onto an untested environment.
+        * If the tests fail, output is in tests/*.test.out
+
+Finally, you need the associated C driver to use this code.  The C driver
+is called 'fuserldrv' and can be hopefully found near wherever you got
+fuserl.
+
+===================
+Tested Environments
+===================
+
+        * Ubuntu amd64 feisty
+        * Ubuntu i386 gusty
+        * OS/X 10.4 Intel with MacFUSE Core 10.4-1.2.0
+        * FreeBSD 7.0RC1 (i386)
+          * pipe mode does work, but linked-in driver does not work.
+          * thus tests will report FAIL
+            * in tests/fusehello.test.out it should say Failed: 1 and Succeeded: 1 
+            * i think this is a libtool problem. it's definitely not honoring the -avoid_version flag. any freebsd gurus who figure this out let me know. 
