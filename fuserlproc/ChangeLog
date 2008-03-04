@@ -1,5 +1,6 @@
 =Version 0.1.0 [NOT YET RELEASED]=
   * added erlang:nodes () info.
+  * added os:getenv () info.
 
 =Version 0.0.0=
   * Initial version.
