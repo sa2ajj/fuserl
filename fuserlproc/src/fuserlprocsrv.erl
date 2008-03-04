@@ -245,8 +245,8 @@ lookup (_, 6, BinName, _, State) ->
         State };
     none ->
       case maybe_env_var (Name) of
-        { env_var, Var } ->
-          { Ino, NewState } = make_inode ({ env_var, Name }, Var, State),
+        true ->
+          { Ino, NewState } = make_inode ({ env_var, Name }, void, State),
           { #fuse_reply_entry{ 
               fuse_entry_param = #fuse_entry_param{ ino = Ino,
                                                     generation = 1,  % (?)
