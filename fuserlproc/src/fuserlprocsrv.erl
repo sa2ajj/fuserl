@@ -54,11 +54,13 @@ terminate (_Reason, _State) -> ok.
 % /processes -> 3
 % /system -> 4
 % /nodes -> 5
+% /environment -> 6
 % 
 % /ports/XXX -> inodes table
 % /processses/XXX -> inodes table
 % /system/XXX -> inodes table
 % /nodes/XXX -> inodes table
+% /environment/XXX -> inodes table
 
 getattr (_, 1, _, State) ->
   { #fuse_reply_attr{ attr = ?DIRATTR, attr_timeout_ms = 1000 }, State };
