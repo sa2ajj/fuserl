@@ -1,4 +1,5 @@
-=Version 0.2.0 [NOT YET RELEASED]=
+=Version 0.2.0=
+  * set inodes for directories.
 
 =Version 0.1.0=
   * added erlang:nodes () info.

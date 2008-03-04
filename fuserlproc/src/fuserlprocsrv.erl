@@ -43,10 +43,9 @@ code_change (_OldVsn, State, _Extra) -> { ok, State }.
 handle_info (_Msg, State) -> { noreply, State }.
 terminate (_Reason, _State) -> ok.
 
--define (DIRATTR, #stat{ st_mode = ?S_IFDIR bor 8#0555, st_nlink = 1 }).
--define (DIRATTR_I (X), #stat{ st_ino = (X), 
-                               st_mode = ?S_IFDIR bor 8#0555, 
-                               st_nlink = 1 }).
+-define (DIRATTR (X), #stat{ st_ino = (X), 
+                             st_mode = ?S_IFDIR bor 8#0555, 
+                             st_nlink = 1 }).
 -define (LINKATTR, #stat{ st_mode = ?S_IFLNK bor 8#0555, st_nlink = 1 }).
 
 % / -> 1
@@ -63,23 +62,24 @@ terminate (_Reason, _State) -> ok.
 % /environment/XXX -> inodes table
 
 getattr (_, 1, _, State) ->
-  { #fuse_reply_attr{ attr = ?DIRATTR, attr_timeout_ms = 1000 }, State };
+  { #fuse_reply_attr{ attr = ?DIRATTR (1), attr_timeout_ms = 1000 }, State };
 getattr (_, 2, _, State) ->
-  { #fuse_reply_attr{ attr = ?DIRATTR, attr_timeout_ms = 1000 }, State };
+  { #fuse_reply_attr{ attr = ?DIRATTR (2), attr_timeout_ms = 1000 }, State };
 getattr (_, 3, _, State) ->
-  { #fuse_reply_attr{ attr = ?DIRATTR, attr_timeout_ms = 1000 }, State };
+  { #fuse_reply_attr{ attr = ?DIRATTR (3), attr_timeout_ms = 1000 }, State };
 getattr (_, 4, _, State) ->
-  { #fuse_reply_attr{ attr = ?DIRATTR, attr_timeout_ms = 1000 }, State };
+  { #fuse_reply_attr{ attr = ?DIRATTR (4), attr_timeout_ms = 1000 }, State };
 getattr (_, 5, _, State) ->
-  { #fuse_reply_attr{ attr = ?DIRATTR, attr_timeout_ms = 1000 }, State };
+  { #fuse_reply_attr{ attr = ?DIRATTR (5), attr_timeout_ms = 1000 }, State };
 getattr (_, 6, _, State) ->
-  { #fuse_reply_attr{ attr = ?DIRATTR, attr_timeout_ms = 1000 }, State };
+  { #fuse_reply_attr{ attr = ?DIRATTR (6), attr_timeout_ms = 1000 }, State };
 getattr (_, X, _, State) ->
   case gb_trees:lookup (X, State#fuserlprocsrv.inodes) of
     { value, { Type, _ } } when (Type =:= port) or
                                 (Type =:= pid) or
                                 (Type =:= nodes) ->
-      { #fuse_reply_attr{ attr = ?DIRATTR, attr_timeout_ms = 1000 }, State };
+      { #fuse_reply_attr{ attr = ?DIRATTR (X), attr_timeout_ms = 1000 }, 
+        State };
     { value, { Type, _ } } when (Type =:= registered) ->
       { #fuse_reply_attr{ attr = ?LINKATTR, attr_timeout_ms = 1000 }, State };
     { value, { env_var, Name } } ->
@@ -108,7 +108,7 @@ lookup (_, 1, <<"ports">>, _, State) ->
                                             generation = 1,  % (?)
                                             attr_timeout_ms = 1000,
                                             entry_timeout_ms = 1000,
-                                            attr = ?DIRATTR } },
+                                            attr = ?DIRATTR (2) } },
     State };
 lookup (_, 1, <<"processes">>, _, State) ->
   { #fuse_reply_entry{ 
@@ -116,7 +116,7 @@ lookup (_, 1, <<"processes">>, _, State) ->
                                             generation = 1,  % (?)
                                             attr_timeout_ms = 1000,
                                             entry_timeout_ms = 1000,
-                                            attr = ?DIRATTR } },
+                                            attr = ?DIRATTR (3) } },
     State };
 lookup (_, 1, <<"system">>, _, State) ->
   { #fuse_reply_entry{ 
@@ -124,7 +124,7 @@ lookup (_, 1, <<"system">>, _, State) ->
                                             generation = 1,  % (?)
                                             attr_timeout_ms = 1000,
                                             entry_timeout_ms = 1000,
-                                            attr = ?DIRATTR } },
+                                            attr = ?DIRATTR (4) } },
     State };
 lookup (_, 1, <<"nodes">>, _, State) ->
   { #fuse_reply_entry{ 
@@ -132,7 +132,7 @@ lookup (_, 1, <<"nodes">>, _, State) ->
                                             generation = 1,  % (?)
                                             attr_timeout_ms = 1000,
                                             entry_timeout_ms = 1000,
-                                            attr = ?DIRATTR } },
+                                            attr = ?DIRATTR (5) } },
     State };
 lookup (_, 1, <<"environment">>, _, State) ->
   { #fuse_reply_entry{ 
@@ -140,7 +140,7 @@ lookup (_, 1, <<"environment">>, _, State) ->
                                             generation = 1,  % (?)
                                             attr_timeout_ms = 1000,
                                             entry_timeout_ms = 1000,
-                                            attr = ?DIRATTR } },
+                                            attr = ?DIRATTR (6) } },
     State };
 lookup (_, 2, BinName, _, State) ->
   Name = erlang:binary_to_list (BinName),
@@ -151,7 +151,7 @@ lookup (_, 2, BinName, _, State) ->
                                                 generation = 1,  % (?)
                                                 attr_timeout_ms = 1000,
                                                 entry_timeout_ms = 1000,
-                                                attr = ?DIRATTR } },
+                                                attr = ?DIRATTR (Ino) } },
         State };
     none ->
       % unfortunately, no erlang:list_to_port (Name) ...
@@ -166,7 +166,7 @@ lookup (_, 3, BinName, _, State) ->
                                                 generation = 1,  % (?)
                                                 attr_timeout_ms = 1000,
                                                 entry_timeout_ms = 1000,
-                                                attr = ?DIRATTR } },
+                                                attr = ?DIRATTR (Ino) } },
         State };
     none ->
       case maybe_pid (Name) of
@@ -177,7 +177,7 @@ lookup (_, 3, BinName, _, State) ->
                                                     generation = 1,  % (?)
                                                     attr_timeout_ms = 1000,
                                                     entry_timeout_ms = 1000,
-                                                    attr = ?DIRATTR } },
+                                                    attr = ?DIRATTR (Ino) } },
             NewState };
         { registered, Pid } ->
           { Ino, NewState } = make_inode ({ registered, Name }, Pid, State),
@@ -216,7 +216,7 @@ lookup (_, 5, BinName, _, State) ->
                                                 generation = 1,  % (?)
                                                 attr_timeout_ms = 1000,
                                                 entry_timeout_ms = 1000,
-                                                attr = ?DIRATTR } },
+                                                attr = ?DIRATTR (Ino) } },
         State };
     none ->
       case maybe_node_type (Name) of
@@ -227,7 +227,7 @@ lookup (_, 5, BinName, _, State) ->
                                                     generation = 1,  % (?)
                                                     attr_timeout_ms = 1000,
                                                     entry_timeout_ms = 1000,
-                                                    attr = ?DIRATTR } },
+                                                    attr = ?DIRATTR (Ino) } },
             NewState };
         _ ->
           { #fuse_reply_err{ err = enoent }, State }
@@ -347,13 +347,13 @@ readdir (_, 1, Size, Offset, _Fi, _, State) ->
        { 0, Size },
        lists:nthtail 
          (Offset,
-          [ #direntry{ name = ".", offset = 1, stat = ?DIRATTR_I (1) },
-            #direntry{ name = "..", offset = 2, stat = ?DIRATTR_I (1) },
-            #direntry{ name = "ports", offset = 3, stat = ?DIRATTR_I (2) },
-            #direntry{ name = "processes", offset = 4, stat = ?DIRATTR_I (3) },
-            #direntry{ name = "system", offset = 5, stat = ?DIRATTR_I (4) },
-            #direntry{ name = "nodes", offset = 6, stat = ?DIRATTR_I (5) },
-            #direntry{ name = "environment", offset = 7, stat = ?DIRATTR_I (6) }
+          [ #direntry{ name = ".", offset = 1, stat = ?DIRATTR (1) },
+            #direntry{ name = "..", offset = 2, stat = ?DIRATTR (1) },
+            #direntry{ name = "ports", offset = 3, stat = ?DIRATTR (2) },
+            #direntry{ name = "processes", offset = 4, stat = ?DIRATTR (3) },
+            #direntry{ name = "system", offset = 5, stat = ?DIRATTR (4) },
+            #direntry{ name = "nodes", offset = 6, stat = ?DIRATTR (5) },
+            #direntry{ name = "environment", offset = 7, stat = ?DIRATTR (6) }
           ])),
 
   { #fuse_reply_direntrylist{ direntrylist = DirEntryList }, State };
@@ -374,8 +374,8 @@ readdir (_, 2, Size, Offset, _Fi, _, State) ->
        { 0, Size },
        lists:nthtail 
          (Offset,
-          [ #direntry{ name = ".", offset = 1, stat = ?DIRATTR_I (2) },
-            #direntry{ name = "..", offset = 2, stat = ?DIRATTR_I (1) } ] ++
+          [ #direntry{ name = ".", offset = 1, stat = ?DIRATTR (2) },
+            #direntry{ name = "..", offset = 2, stat = ?DIRATTR (1) } ] ++
           [ { #direntry{ name = erlang:port_to_list (P), 
                          offset = N + 2 }, 
               P } ||
@@ -413,8 +413,8 @@ readdir (_, 3, Size, Offset, _Fi, _, State) ->
        { 0, Size },
        lists:nthtail 
          (Offset,
-          [ #direntry{ name = ".", offset = 1, stat = ?DIRATTR_I (3) },
-            #direntry{ name = "..", offset = 2, stat = ?DIRATTR_I (1) } ] ++
+          [ #direntry{ name = ".", offset = 1, stat = ?DIRATTR (3) },
+            #direntry{ name = "..", offset = 2, stat = ?DIRATTR (1) } ] ++
           [ { #direntry{ name = erlang:pid_to_list (P), offset = N + 2 }, 
               { pid, P } } ||
             { N, P } <- index (Processes) ] ++
@@ -472,8 +472,8 @@ readdir (_, 4, Size, Offset, _Fi, _, State) ->
        { 0, Size },
        lists:nthtail 
          (Offset,
-          [ #direntry{ name = ".", offset = 1, stat = ?DIRATTR_I (4) },
-            #direntry{ name = "..", offset = 2, stat = ?DIRATTR_I (1) } ] ++
+          [ #direntry{ name = ".", offset = 1, stat = ?DIRATTR (4) },
+            #direntry{ name = "..", offset = 2, stat = ?DIRATTR (1) } ] ++
           [ { #direntry{ name = atom_to_list (Item),
                          offset = N + 2,
                          stat = #stat{ st_mode = ?S_IFREG bor 8#0444,
@@ -517,11 +517,11 @@ readdir (_, 5, Size, Offset, _Fi, _, State) ->
        { 0, Size },
        lists:nthtail 
          (Offset,
-          [ #direntry{ name = ".", offset = 1, stat = ?DIRATTR_I (5) },
-            #direntry{ name = "..", offset = 2, stat = ?DIRATTR_I (1) } ] ++
+          [ #direntry{ name = ".", offset = 1, stat = ?DIRATTR (5) },
+            #direntry{ name = "..", offset = 2, stat = ?DIRATTR (1) } ] ++
           [ { #direntry{ name = atom_to_list (Item), 
                          offset = N + 2, 
-                         stat = ?DIRATTR }, Item }
+                         stat = ?DIRATTR (undefined) }, Item }
             || { N, Item } <- index (Items) ])),
 
   { MappedList, NewState } = 
@@ -551,8 +551,8 @@ readdir (_, 6, Size, Offset, _Fi, _, State) ->
        { 0, Size },
        lists:nthtail 
          (Offset,
-          [ #direntry{ name = ".", offset = 1, stat = ?DIRATTR_I (6) },
-            #direntry{ name = "..", offset = 2, stat = ?DIRATTR_I (1) } ] ++
+          [ #direntry{ name = ".", offset = 1, stat = ?DIRATTR (6) },
+            #direntry{ name = "..", offset = 2, stat = ?DIRATTR (1) } ] ++
           [ #direntry{ name = Var, 
                        offset = N + 2, 
                        stat = #stat{ st_mode = ?S_IFREG bor 8#0444,
@@ -794,8 +794,8 @@ read_nodes_directory (Dot, Name, Size, Offset, State) ->
        { 0, Size },
        lists:nthtail 
          (Offset,
-          [ #direntry{ name = ".", offset = 1, stat = ?DIRATTR_I (Dot) },
-            #direntry{ name = "..", offset = 2, stat = ?DIRATTR_I (5) } ] ++
+          [ #direntry{ name = ".", offset = 1, stat = ?DIRATTR (Dot) },
+            #direntry{ name = "..", offset = 2, stat = ?DIRATTR (5) } ] ++
           [ { #direntry{ name = atom_to_list (Node),
                          offset = N + 2,
                          stat = #stat{ st_mode = ?S_IFREG bor 8#0444,
@@ -837,8 +837,8 @@ read_pid_directory (Dot, Name, Size, Offset, State) ->
        { 0, Size },
        lists:nthtail 
          (Offset,
-          [ #direntry{ name = ".", offset = 1, stat = ?DIRATTR_I (Dot) },
-            #direntry{ name = "..", offset = 2, stat = ?DIRATTR_I (3) } ] ++
+          [ #direntry{ name = ".", offset = 1, stat = ?DIRATTR (Dot) },
+            #direntry{ name = "..", offset = 2, stat = ?DIRATTR (3) } ] ++
           [ { #direntry{ name = atom_to_list (Item),
                          offset = N + 2,
                          stat = #stat{ st_mode = ?S_IFREG bor 8#0444,
@@ -880,8 +880,8 @@ read_port_directory (Dot, Name, Size, Offset, State) ->
        { 0, Size },
        lists:nthtail 
          (Offset,
-          [ #direntry{ name = ".", offset = 1, stat = ?DIRATTR_I (Dot) },
-            #direntry{ name = "..", offset = 2, stat = ?DIRATTR_I (2) } ] ++
+          [ #direntry{ name = ".", offset = 1, stat = ?DIRATTR (Dot) },
+            #direntry{ name = "..", offset = 2, stat = ?DIRATTR (2) } ] ++
           [ { #direntry{ name = atom_to_list (Item),
                          offset = N + 2,
                          stat = #stat{ st_mode = ?S_IFREG bor 8#0444,
