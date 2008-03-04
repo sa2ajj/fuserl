@@ -1,0 +1,9 @@
+=Version 0.2.0=
+  * set inodes for directories.
+
+=Version 0.1.0=
+  * added erlang:nodes () info.
+  * added os:getenv () info.
+
+=Version 0.0.0=
+  * Initial version.
