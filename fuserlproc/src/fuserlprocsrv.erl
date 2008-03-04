@@ -35,16 +35,18 @@ start_link (LinkedIn, Dir) ->
 init ([]) ->
   State = #fuserlprocsrv{ inodes = gb_trees:from_orddict ([ { 5, [] } ]),
                           names = gb_trees:empty () },
-  % cheesy: pre-alloc system info inodes, nodes inodes
+  % cheesy: pre-alloc system info inodes
   { _, NewState } = readdir (void, 4, 100000, 0, void, void, State),
-  { _, NewNewState } = readdir (void, 5, 100000, 0, void, void, NewState),
-  { ok, NewNewState }.
+  { ok, NewState }.
 
 code_change (_OldVsn, State, _Extra) -> { ok, State }.
 handle_info (_Msg, State) -> { noreply, State }.
 terminate (_Reason, _State) -> ok.
 
 -define (DIRATTR, #stat{ st_mode = ?S_IFDIR bor 8#0555, st_nlink = 1 }).
+-define (DIRATTR_I (X), #stat{ st_ino = (X), 
+                               st_mode = ?S_IFDIR bor 8#0555, 
+                               st_nlink = 1 }).
 -define (LINKATTR, #stat{ st_mode = ?S_IFLNK bor 8#0555, st_nlink = 1 }).
 
 % / -> 1
@@ -71,23 +73,24 @@ getattr (_, 5, _, State) ->
 getattr (_, X, _, State) ->
   case gb_trees:lookup (X, State#fuserlprocsrv.inodes) of
     { value, { Type, _ } } when (Type =:= port) or
-                                (Type =:= pid) ->
+                                (Type =:= pid) or
+                                (Type =:= nodes) ->
       { #fuse_reply_attr{ attr = ?DIRATTR, attr_timeout_ms = 1000 }, State };
+    { value, { Type, _ } } when (Type =:= registered) ->
+      { #fuse_reply_attr{ attr = ?LINKATTR, attr_timeout_ms = 1000 }, State };
+    { value, { nodes_item, NodesItem } } ->
+      Attr = nodes_item_attr (NodesItem, State),
+      { #fuse_reply_attr{ attr = Attr, attr_timeout_ms = 1000 }, State };
+    { value, { pid_item, PidItem } } ->
+      Attr = pid_item_attr (PidItem, State),
+      { #fuse_reply_attr{ attr = Attr, attr_timeout_ms = 1000 }, State };
     { value, { port_item, PortItem } } ->
       { #fuse_reply_attr{ attr = port_item_attr (PortItem, State),
                           attr_timeout_ms = 1000 },
         State };
-    { value, { pid_item, PidItem } } ->
-      Attr = pid_item_attr (PidItem, State),
-      { #fuse_reply_attr{ attr = Attr, attr_timeout_ms = 1000 }, State };
     { value, { system_item, Name } } ->
       Attr = system_item_attr (Name, State),
       { #fuse_reply_attr{ attr = Attr, attr_timeout_ms = 1000 }, State };
-    { value, { nodes_item, Name } } ->
-      Attr = nodes_item_attr (Name, State),
-      { #fuse_reply_attr{ attr = Attr, attr_timeout_ms = 1000 }, State };
-    { value, { Type, _ } } when (Type =:= registered) ->
-      { #fuse_reply_attr{ attr = ?LINKATTR, attr_timeout_ms = 1000 }, State };
     none ->
       { #fuse_reply_err{ err = enoent }, State }
   end.
@@ -191,18 +194,29 @@ lookup (_, 4, BinName, _, State) ->
   end;
 lookup (_, 5, BinName, _, State) ->
   Name = erlang:binary_to_list (BinName),
-  case gb_trees:lookup ({ nodes_item, Name }, State#fuserlprocsrv.names) of
+  case gb_trees:lookup ({ nodes, Name }, State#fuserlprocsrv.names) of
     { value, { Ino, _ } } ->
       { #fuse_reply_entry{ 
-          fuse_entry_param = 
-            #fuse_entry_param{ ino = Ino,
-                               generation = 1,  % (?)
-                               attr_timeout_ms = 1000,
-                               entry_timeout_ms = 1000,
-                               attr = nodes_item_attr (Name, State) } },
+          fuse_entry_param = #fuse_entry_param{ ino = Ino,
+                                                generation = 1,  % (?)
+                                                attr_timeout_ms = 1000,
+                                                entry_timeout_ms = 1000,
+                                                attr = ?DIRATTR } },
         State };
     none ->
-      { #fuse_reply_err{ err = enoent }, State }
+      case maybe_node_type (Name) of
+        { node_type, Item } ->
+          { Ino, NewState } = make_inode ({ nodes, Name }, Item, State),
+          { #fuse_reply_entry{ 
+              fuse_entry_param = #fuse_entry_param{ ino = Ino,
+                                                    generation = 1,  % (?)
+                                                    attr_timeout_ms = 1000,
+                                                    entry_timeout_ms = 1000,
+                                                    attr = ?DIRATTR } },
+            NewState };
+        _ ->
+          { #fuse_reply_err{ err = enoent }, State }
+      end
   end;
 lookup (_, X, Name, _, State) ->
   case gb_trees:lookup (X, State#fuserlprocsrv.inodes) of
@@ -214,6 +228,10 @@ lookup (_, X, Name, _, State) ->
       lookup_pid_item (PidName, 
                        list_to_atom (binary_to_list (Name)),
                        State);
+    { value, { nodes, NodesName } } ->
+      lookup_nodes_item (list_to_atom (NodesName),
+                         list_to_atom (binary_to_list (Name)),
+                         State);
     none ->
       { #fuse_reply_err{ err = enoent }, State }
   end.
@@ -236,6 +254,7 @@ open (_, X, Fi = #fuse_file_info{}, _, State) ->
                                 (Type =:= pid_item) or
                                 (Type =:= registered) or 
                                 (Type =:= system_item) or
+                                (Type =:= nodes) or
                                 (Type =:= nodes_item) ->
       case (Fi#fuse_file_info.flags band ?O_ACCMODE) =/= ?O_RDONLY of
         true ->
@@ -250,18 +269,19 @@ open (_, X, Fi = #fuse_file_info{}, _, State) ->
 read (_, X, Size, Offset, _Fi, _, State) ->
   case gb_trees:lookup (X, State#fuserlprocsrv.inodes) of
     { value, { Type, _ } } when (Type =:= port) or
-                                (Type =:= pid) ->
+                                (Type =:= pid) or
+                                (Type =:= nodes) ->
       { #fuse_reply_err{ err = eisdir }, State };
-    { value, { port_item, PortItem } } ->
-      read_port_item (PortItem, Size, Offset, State);
+    { value, { nodes_item, NodesItem } } ->
+      read_nodes_item (NodesItem, Size, Offset, State);
     { value, { pid_item, PidItem } } ->
       read_pid_item (PidItem, Size, Offset, State);
+    { value, { port_item, PortItem } } ->
+      read_port_item (PortItem, Size, Offset, State);
     { value, { registered, _ } } ->
       { #fuse_reply_err{ err = einval }, State };
     { value, { system_item, Name } } ->
       read_system_item (Name, Size, Offset, State);
-    { value, { nodes_item, Name } } ->
-      read_nodes_item (Name, Size, Offset, State);
     none ->
       { #fuse_reply_err{ err = enoent }, State }
   end.
@@ -284,20 +304,22 @@ readdir (_, 1, Size, Offset, _Fi, _, State) ->
        { 0, Size },
        lists:nthtail 
          (Offset,
-          [ #direntry{ name = ".", offset = 1, stat = #stat{ st_ino = 1 } },
-            #direntry{ name = "..", offset = 2, stat = #stat{ st_ino = 1 } },
-            #direntry{ name = "ports", offset = 3, stat = #stat{ st_ino = 2 } },
-            #direntry{ name = "processes", offset = 4, stat = #stat{ st_ino = 3 } },
-            #direntry{ name = "system", offset = 5, stat = #stat{ st_ino = 4 } },
-            #direntry{ name = "nodes", offset = 6, stat = #stat{ st_ino = 5 } }
+          [ #direntry{ name = ".", offset = 1, stat = ?DIRATTR_I (1) },
+            #direntry{ name = "..", offset = 2, stat = ?DIRATTR_I (1) },
+            #direntry{ name = "ports", offset = 3, stat = ?DIRATTR_I (2) },
+            #direntry{ name = "processes", offset = 4, stat = ?DIRATTR_I (3) },
+            #direntry{ name = "system", offset = 5, stat = ?DIRATTR_I (4) },
+            #direntry{ name = "nodes", offset = 6, stat = ?DIRATTR_I (5) }
           ])),
 
   { #fuse_reply_direntrylist{ direntrylist = DirEntryList }, State };
 readdir (_, 2, Size, Offset, _Fi, _, State) ->
   DirEntryList = 
     take_while 
-      (fun ({ E, _ }, { Total, Max }) -> 
-         Cur = fuserlsrv:dirent_size (E),
+      (fun (R, { Total, Max }) -> 
+         Cur = case R of { E, _ } -> fuserlsrv:dirent_size (E);
+                         E -> fuserlsrv:dirent_size (E)
+               end,
          if 
            Total + Cur =< Max ->
              { continue, { Total + Cur, Max } };
@@ -308,14 +330,20 @@ readdir (_, 2, Size, Offset, _Fi, _, State) ->
        { 0, Size },
        lists:nthtail 
          (Offset,
-          [ { #direntry{ name = erlang:port_to_list (P), offset = N }, P } ||
+          [ #direntry{ name = ".", offset = 1, stat = ?DIRATTR_I (2) },
+            #direntry{ name = "..", offset = 2, stat = ?DIRATTR_I (1) } ] ++
+          [ { #direntry{ name = erlang:port_to_list (P), 
+                         offset = N + 2 }, 
+              P } ||
             { N, P } <- index (erlang:ports ()) ])),
 
   { MappedList, NewState } = 
     lists:mapfoldl (fun ({ E = #direntry{ name = Name }, Port }, Acc) ->
                       { Ino, NewAcc } = 
                         make_inode ({ port, Name }, Port, Acc),
-                      { E#direntry{ stat = #stat{ st_ino = Ino } }, NewAcc }
+                      { E#direntry{ stat = #stat{ st_ino = Ino } }, NewAcc };
+                        (E = #direntry{}, Acc) ->
+                      { E, Acc }
                     end,
                     State,
                     DirEntryList),
@@ -327,8 +355,10 @@ readdir (_, 3, Size, Offset, _Fi, _, State) ->
 
   DirEntryList = 
     take_while 
-      (fun ({ E, _ }, { Total, Max }) -> 
-         Cur = fuserlsrv:dirent_size (E),
+      (fun (R, { Total, Max }) -> 
+         Cur = case R of { E, _ } -> fuserlsrv:dirent_size (E);
+                         E -> fuserlsrv:dirent_size (E)
+               end,
          if 
            Total + Cur =< Max ->
              { continue, { Total + Cur, Max } };
@@ -339,10 +369,12 @@ readdir (_, 3, Size, Offset, _Fi, _, State) ->
        { 0, Size },
        lists:nthtail 
          (Offset,
-          [ { #direntry{ name = erlang:pid_to_list (P), offset = N }, 
+          [ #direntry{ name = ".", offset = 1, stat = ?DIRATTR_I (3) },
+            #direntry{ name = "..", offset = 2, stat = ?DIRATTR_I (1) } ] ++
+          [ { #direntry{ name = erlang:pid_to_list (P), offset = N + 2 }, 
               { pid, P } } ||
             { N, P } <- index (Processes) ] ++
-          [ { #direntry{ name = atom_to_list (R), offset = N + NumProcesses }, 
+          [ { #direntry{ name = atom_to_list (R), offset = N + 2 + NumProcesses }, 
               { registered, P } } ||
             { N, { P, R } }
               <- index 
@@ -359,7 +391,9 @@ readdir (_, 3, Size, Offset, _Fi, _, State) ->
                         ({ E = #direntry{ name = Name }, { registered, Pid } }, Acc) ->
                       { Ino, NewAcc } = 
                         make_inode ({ registered, Name }, Pid, Acc),
-                      { E#direntry{ stat = #stat{ st_ino = Ino } }, NewAcc }
+                      { E#direntry{ stat = #stat{ st_ino = Ino } }, NewAcc };
+                        (E = #direntry{}, Acc) ->
+                      { E, Acc }
                     end,
                     State,
                     DirEntryList),
@@ -380,8 +414,10 @@ readdir (_, 4, Size, Offset, _Fi, _, State) ->
 
   DirEntryList = 
     take_while 
-      (fun ({ E, _ }, { Total, Max }) -> 
-         Cur = fuserlsrv:dirent_size (E),
+      (fun (R, { Total, Max }) -> 
+       Cur = case R of { E, _ } -> fuserlsrv:dirent_size (E);
+                       E -> fuserlsrv:dirent_size (E)
+             end,
          if 
            Total + Cur =< Max ->
              { continue, { Total + Cur, Max } };
@@ -392,8 +428,10 @@ readdir (_, 4, Size, Offset, _Fi, _, State) ->
        { 0, Size },
        lists:nthtail 
          (Offset,
+          [ #direntry{ name = ".", offset = 1, stat = ?DIRATTR_I (4) },
+            #direntry{ name = "..", offset = 2, stat = ?DIRATTR_I (1) } ] ++
           [ { #direntry{ name = atom_to_list (Item),
-                         offset = N,
+                         offset = N + 2,
                          stat = #stat{ st_mode = ?S_IFREG bor 8#0444,
                                        st_size = StSize } },
               Item } ||
@@ -402,13 +440,15 @@ readdir (_, 4, Size, Offset, _Fi, _, State) ->
                             I <- Items,
                             is_valid_system_info (I) ]),
             StSize 
-              <- [ erlang:iolist_size (io_lib:format ("~p~n", [ Info ])) ] ])),
+              <- [ erlang:iolist_size (io_lib:format ("~p.~n", [ Info ])) ] ])),
 
   { MappedList, NewState } = 
     lists:mapfoldl (fun ({ E = #direntry{ name = Name }, Item }, Acc) ->
                       { Ino, NewAcc } = 
                         make_inode ({ system_item, Name }, Item, Acc),
-                      { E#direntry{ stat = #stat{ st_ino = Ino } }, NewAcc }
+                      { E#direntry{ stat = #stat{ st_ino = Ino } }, NewAcc };
+                        (E = #direntry{}, Acc) ->
+                      { E, Acc }
                     end,
                     State,
                     DirEntryList),
@@ -419,8 +459,10 @@ readdir (_, 5, Size, Offset, _Fi, _, State) ->
 
   DirEntryList = 
     take_while 
-      (fun ({ E, _ }, { Total, Max }) -> 
-         Cur = fuserlsrv:dirent_size (E),
+      (fun (R, { Total, Max }) -> 
+         Cur = case R of { E, _ } -> fuserlsrv:dirent_size (E);
+                          E -> fuserlsrv:dirent_size (E)
+               end,
          if 
            Total + Cur =< Max ->
              { continue, { Total + Cur, Max } };
@@ -431,23 +473,20 @@ readdir (_, 5, Size, Offset, _Fi, _, State) ->
        { 0, Size },
        lists:nthtail 
          (Offset,
-          [ { #direntry{ name = atom_to_list (Item),
-                         offset = N,
-                         stat = #stat{ st_mode = ?S_IFREG bor 8#0444,
-                                       st_size = StSize } },
-              Item } ||
-            { N, { Item, Info } } 
-              <- index ([ { I, erlang:nodes (I) } || 
-                            I <- Items,
-                            is_valid_nodes_info (I) ]),
-            StSize 
-              <- [ erlang:iolist_size (io_lib:format ("~p~n", [ Info ])) ] ])),
+          [ #direntry{ name = ".", offset = 1, stat = ?DIRATTR_I (5) },
+            #direntry{ name = "..", offset = 2, stat = ?DIRATTR_I (1) } ] ++
+          [ { #direntry{ name = atom_to_list (Item), 
+                         offset = N + 2, 
+                         stat = ?DIRATTR }, Item }
+            || { N, Item } <- index (Items) ])),
 
   { MappedList, NewState } = 
     lists:mapfoldl (fun ({ E = #direntry{ name = Name }, Item }, Acc) ->
                       { Ino, NewAcc } = 
-                        make_inode ({ nodes_item, Name }, Item, Acc),
-                      { E#direntry{ stat = #stat{ st_ino = Ino } }, NewAcc }
+                        make_inode ({ nodes, Name }, Item, Acc),
+                      { E#direntry{ stat = #stat{ st_ino = Ino } }, NewAcc };
+                        (E = #direntry{}, Acc) ->
+                      { E, Acc }
                     end,
                     State,
                     DirEntryList),
@@ -455,12 +494,16 @@ readdir (_, 5, Size, Offset, _Fi, _, State) ->
   { #fuse_reply_direntrylist{ direntrylist = MappedList }, NewState };
 readdir (_, X, Size, Offset, _Fi, _, State) ->
   case gb_trees:lookup (X, State#fuserlprocsrv.inodes) of
-    { value, { port, Name } } ->
-      read_port_directory (Name, Size, Offset, State);
-    { value, { port_item, _ } } ->
+    { value, { nodes, Name } } ->
+      read_nodes_directory (X, Name, Size, Offset, State);
+    { value, { nodes_item, _ } } ->
       { #fuse_reply_err{ err = enotdir }, State };
     { value, { pid, Name } } ->
-      read_pid_directory (Name, Size, Offset, State);
+      read_pid_directory (X, Name, Size, Offset, State);
+    { value, { port, Name } } ->
+      read_port_directory (X, Name, Size, Offset, State);
+    { value, { port_item, _ } } ->
+      { #fuse_reply_err{ err = enotdir }, State };
     { value, { registered, _ } } ->
       { #fuse_reply_err{ err = enotdir }, State };
     { value, { system_item, _ } } ->
@@ -486,17 +529,10 @@ readlink (_, X, _, State) ->
 %-                               Private                               -
 %-=====================================================================-
 
+index ([]) ->
+  [];
 index (L) ->
   lists:zip (lists:seq (1, length (L)), L).
-
-is_valid_nodes_info (Item) ->
-  try
-    erlang:nodes (Item),
-    true
-  catch
-    _ : _ ->
-      false
-  end.
 
 is_valid_system_info (Item) ->
   try
@@ -505,6 +541,25 @@ is_valid_system_info (Item) ->
   catch
     _ : _ ->
       false
+  end.
+
+lookup_nodes_item (Item, Node, State) ->
+  case lists:member (Node, erlang:nodes (Item)) of
+    true ->
+      { Ino, NewState } = make_inode ({ nodes_item, { Item, Node } }, 
+                                      void, 
+                                      State),
+      { #fuse_reply_entry{ 
+          fuse_entry_param = 
+            #fuse_entry_param{ ino = Ino,
+                               generation = 1,  % (?)
+                               attr_timeout_ms = 1000,
+                               entry_timeout_ms = 1000,
+                               attr = nodes_item_attr ({ Item, Node }, 
+                                                       NewState) } },
+        NewState };
+    false ->
+      { #fuse_reply_err{ err = enoent }, State }
   end.
 
 lookup_pid_item (Name, Item, State) ->
@@ -542,6 +597,15 @@ make_inode (Name, Extra, State) ->
       { Max + 1, State#fuserlprocsrv{ inodes = NewInodes, names = NewNames } }
   end.
 
+maybe_node_type (Name) ->
+  case lists:member (Name, 
+                     [ "visible", "hidden", "connected", "this", "known" ]) of
+    true ->
+      { node_type, list_to_atom (Name) };
+    false ->
+      false
+  end.
+
 maybe_pid (Name) ->
   case catch erlang:list_to_pid (Name) of
     Pid when is_pid (Pid) ->
@@ -555,20 +619,11 @@ maybe_pid (Name) ->
       end
   end.
 
-nodes_item_attr (Name, State) ->
-  try
-    Item = list_to_atom (Name),
-    case erlang:nodes (Item) of
-      Nodes when is_list (Nodes) ->
-        { Ino, _ } = gb_trees:get ({ nodes_item, Name }, 
-                                   State#fuserlprocsrv.names),
-        StSize = erlang:iolist_size (io_lib:format ("~p~n", [ Nodes ])),
-        #stat{ st_ino = Ino, st_mode = ?S_IFREG bor 8#0444, st_size = StSize }
-    end
-  catch
-    _ : _ ->
-      #stat{ st_ino = 0, st_mode = ?S_IFREG bor 8#0444, st_size = 0 }
-  end.
+nodes_item_attr ({ Item, Node }, State) ->
+  { Ino, _ } = gb_trees:get ({ nodes_item, { Item, Node } }, 
+                             State#fuserlprocsrv.names),
+
+  #stat{ st_ino = Ino, st_mode = ?S_IFREG bor 8#0444, st_size = 0 }.
 
 pid_item_attr ({ Name, Item }, State) ->
   { _, Pid } = gb_trees:get ({ pid, Name }, State#fuserlprocsrv.names),
@@ -577,7 +632,7 @@ pid_item_attr ({ Name, Item }, State) ->
       { Item, Info } ->
         { Ino, _ } = gb_trees:get ({ pid_item, { Name, Item } }, 
                                    State#fuserlprocsrv.names),
-        StSize = erlang:iolist_size (io_lib:format ("~p~n", [ Info ])),
+        StSize = erlang:iolist_size (io_lib:format ("~p.~n", [ Info ])),
         #stat{ st_ino = Ino, st_mode = ?S_IFREG bor 8#0444, st_size = StSize };
       [] when Item =:= registered_name ->
         #stat{ st_ino = 0, st_mode = ?S_IFREG bor 8#0444, st_size = 0 };
@@ -596,7 +651,7 @@ port_item_attr ({ Name, Item }, State) ->
       { Item, Info } ->
         { Ino, _ } = gb_trees:get ({ port_item, { Name, Item } }, 
                                    State#fuserlprocsrv.names),
-        StSize = erlang:iolist_size (io_lib:format ("~p~n", [ Info ])),
+        StSize = erlang:iolist_size (io_lib:format ("~p.~n", [ Info ])),
         #stat{ st_ino = Ino, st_mode = ?S_IFREG bor 8#0444, st_size = StSize };
       undefined ->
         #stat{ st_ino = 0, st_mode = ?S_IFREG bor 8#0444, st_size = 0 }
@@ -606,12 +661,14 @@ port_item_attr ({ Name, Item }, State) ->
       #stat{ st_ino = 0, st_mode = ?S_IFREG bor 8#0444, st_size = 0 }
   end.
 
-read_pid_directory (Name, Size, Offset, State) ->
-  { _, Pid } = gb_trees:get ({ pid, Name }, State#fuserlprocsrv.names),
+read_nodes_directory (Dot, Name, Size, Offset, State) ->
+  { _, Item } = gb_trees:get ({ nodes, Name }, State#fuserlprocsrv.names),
   DirEntryList = 
     take_while 
-      (fun ({ E, _ }, { Total, Max }) -> 
-         Cur = fuserlsrv:dirent_size (E),
+      (fun (R, { Total, Max }) -> 
+         Cur = case R of { E, _ } -> fuserlsrv:dirent_size (E);
+                         E -> fuserlsrv:dirent_size (E)
+               end,
          if 
            Total + Cur =< Max ->
              { continue, { Total + Cur, Max } };
@@ -622,33 +679,82 @@ read_pid_directory (Name, Size, Offset, State) ->
        { 0, Size },
        lists:nthtail 
          (Offset,
+          [ #direntry{ name = ".", offset = 1, stat = ?DIRATTR_I (Dot) },
+            #direntry{ name = "..", offset = 2, stat = ?DIRATTR_I (5) } ] ++
+          [ { #direntry{ name = atom_to_list (Node),
+                         offset = N + 2,
+                         stat = #stat{ st_mode = ?S_IFREG bor 8#0444,
+                                       st_size = 0 } },
+              Node } ||
+            { N, Node } <- index (erlang:nodes (Item)) ])),
+
+  { MappedList, NewState } = 
+    lists:mapfoldl (fun ({ E = #direntry{ stat = Stat }, Node }, Acc) ->
+                      { Ino, NewAcc } = 
+                        make_inode ({ nodes_item, { Item, Node } }, void, Acc),
+                      { E#direntry{ stat = Stat#stat{ st_ino = Ino } },
+                        NewAcc };
+                        (E = #direntry{}, Acc) ->
+                      { E, Acc }
+                    end,
+                    State,
+                    DirEntryList),
+  { #fuse_reply_direntrylist{ direntrylist = MappedList }, NewState }.
+
+read_nodes_item (_, _, _, State) ->
+  { #fuse_reply_buf{ buf = <<>>, size = 0 }, State }.
+
+read_pid_directory (Dot, Name, Size, Offset, State) ->
+  { _, Pid } = gb_trees:get ({ pid, Name }, State#fuserlprocsrv.names),
+  DirEntryList = 
+    take_while 
+      (fun (R, { Total, Max }) -> 
+         Cur = case R of { E, _ } -> fuserlsrv:dirent_size (E);
+                         E -> fuserlsrv:dirent_size (E)
+               end,
+         if 
+           Total + Cur =< Max ->
+             { continue, { Total + Cur, Max } };
+           true ->
+             stop
+         end
+       end,
+       { 0, Size },
+       lists:nthtail 
+         (Offset,
+          [ #direntry{ name = ".", offset = 1, stat = ?DIRATTR_I (Dot) },
+            #direntry{ name = "..", offset = 2, stat = ?DIRATTR_I (3) } ] ++
           [ { #direntry{ name = atom_to_list (Item),
-                         offset = N,
+                         offset = N + 2,
                          stat = #stat{ st_mode = ?S_IFREG bor 8#0444,
                                        st_size = StSize } },
               Item } ||
             { N, { Item, Info } } 
               <- index (erlang:process_info (Pid)),
             StSize 
-              <- [ erlang:iolist_size (io_lib:format ("~p~n", [ Info ])) ] ])),
+              <- [ erlang:iolist_size (io_lib:format ("~p.~n", [ Info ])) ] ])),
 
   { MappedList, NewState } = 
     lists:mapfoldl (fun ({ E = #direntry{ stat = Stat }, Item }, Acc) ->
                       { Ino, NewAcc } = 
                         make_inode ({ pid_item, { Name, Item } }, void, Acc),
                       { E#direntry{ stat = Stat#stat{ st_ino = Ino } },
-                        NewAcc }
+                        NewAcc };
+                        (E = #direntry{}, Acc) ->
+                      { E, Acc }
                     end,
                     State,
                     DirEntryList),
   { #fuse_reply_direntrylist{ direntrylist = MappedList }, NewState }.
 
-read_port_directory (Name, Size, Offset, State) ->
+read_port_directory (Dot, Name, Size, Offset, State) ->
   { _, Port } = gb_trees:get ({ port, Name }, State#fuserlprocsrv.names),
   DirEntryList = 
     take_while 
-      (fun ({ E, _ }, { Total, Max }) -> 
-         Cur = fuserlsrv:dirent_size (E),
+      (fun (R, { Total, Max }) -> 
+         Cur = case R of { E, _ } -> fuserlsrv:dirent_size (E);
+                         E -> fuserlsrv:dirent_size (E)
+               end,
          if 
            Total + Cur =< Max ->
              { continue, { Total + Cur, Max } };
@@ -659,59 +765,36 @@ read_port_directory (Name, Size, Offset, State) ->
        { 0, Size },
        lists:nthtail 
          (Offset,
+          [ #direntry{ name = ".", offset = 1, stat = ?DIRATTR_I (Dot) },
+            #direntry{ name = "..", offset = 2, stat = ?DIRATTR_I (2) } ] ++
           [ { #direntry{ name = atom_to_list (Item),
-                         offset = N,
+                         offset = N + 2,
                          stat = #stat{ st_mode = ?S_IFREG bor 8#0444,
                                        st_size = StSize } },
               Item } ||
             { N, { Item, Info } } 
               <- index (erlang:port_info (Port)),
             StSize 
-              <- [ erlang:iolist_size (io_lib:format ("~p~n", [ Info ])) ] ])),
+              <- [ erlang:iolist_size (io_lib:format ("~p.~n", [ Info ])) ] ])),
 
   { MappedList, NewState } = 
     lists:mapfoldl (fun ({ E = #direntry{ stat = Stat }, Item }, Acc) ->
                       { Ino, NewAcc } = 
                         make_inode ({ port_item, { Name, Item } }, void, Acc),
                       { E#direntry{ stat = Stat#stat{ st_ino = Ino } },
-                        NewAcc }
+                        NewAcc };
+                        (E = #direntry{}, Acc) ->
+                      { E, Acc }
                     end,
                     State,
                     DirEntryList),
   { #fuse_reply_direntrylist{ direntrylist = MappedList }, NewState }.
 
-read_nodes_item (Name, Size, Offset, State) ->
-  { _, Item } = gb_trees:get ({ nodes_item, Name }, State#fuserlprocsrv.names),
-  try
-    Nodes = erlang:nodes (Item),
-    IoList = io_lib:format ("~p~n", [ Nodes ]),
-    Len = erlang:iolist_size (IoList),
-    if
-      Offset < Len ->
-        if
-          Offset + Size > Len ->
-            Take = Len - Offset,
-            <<_:Offset/binary, Data:Take/binary, _/binary>> = 
-              erlang:iolist_to_binary (IoList);
-          true ->
-            <<_:Offset/binary, Data:Size/binary, _/binary>> = 
-              erlang:iolist_to_binary (IoList)
-        end;
-      true ->
-        Data = <<>>
-    end,
-
-    { #fuse_reply_buf{ buf = Data, size = erlang:size (Data) }, State }
-  catch
-    _ : _ ->
-      { #fuse_reply_buf{ buf = <<>>, size = 0 }, State }
-  end.
-
 read_pid_item ({ Name, Item }, Size, Offset, State) ->
   { _, Pid } = gb_trees:get ({ pid, Name }, State#fuserlprocsrv.names),
   case erlang:process_info (Pid, Item) of
     { Item, Info } ->
-      IoList = io_lib:format ("~p~n", [ Info ]),
+      IoList = io_lib:format ("~p.~n", [ Info ]),
       Len = erlang:iolist_size (IoList),
 
       if
@@ -740,7 +823,7 @@ read_port_item ({ Name, Item }, Size, Offset, State) ->
   { _, Port } = gb_trees:get ({ port, Name }, State#fuserlprocsrv.names),
   case erlang:port_info (Port, Item) of
     { Item, Info } ->
-      IoList = io_lib:format ("~p~n", [ Info ]),
+      IoList = io_lib:format ("~p.~n", [ Info ]),
       Len = erlang:iolist_size (IoList),
 
       if
@@ -767,7 +850,7 @@ read_system_item (Name, Size, Offset, State) ->
   { _, Item } = gb_trees:get ({ system_item, Name }, State#fuserlprocsrv.names),
   try
     Info = erlang:system_info (Item),
-    IoList = io_lib:format ("~p~n", [ Info ]),
+    IoList = io_lib:format ("~p.~n", [ Info ]),
     Len = erlang:iolist_size (IoList),
     if
       Offset < Len ->
@@ -796,7 +879,7 @@ system_item_attr (Name, State) ->
 
   try
     Info = erlang:system_info (Item),
-    StSize = erlang:iolist_size (io_lib:format ("~p~n", [ Info ])),
+    StSize = erlang:iolist_size (io_lib:format ("~p.~n", [ Info ])),
     #stat{ st_ino = Ino, st_mode = ?S_IFREG bor 8#0444, st_size = StSize }
   catch
     _ : _ ->
