@@ -1,4 +1,4 @@
-=Version 0.1.0 [NOT YET RELEASED]=
+=Version 0.1.0=
   * added erlang:nodes () info.
   * added os:getenv () info.
 
