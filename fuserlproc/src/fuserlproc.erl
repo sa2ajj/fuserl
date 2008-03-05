@@ -19,18 +19,7 @@ start () ->
 
 start (_Type, _Args) ->
   { ok, LinkedIn } = application:get_env (fuserlproc, linked_in),
-  { ok, MountPoint } = 
-    case application:get_env (fuserlproc, mount_point) of
-      R when (R =:= { ok, from_environment }) or (R =:= undefined) ->
-        case os:getenv ("DATADIR") of
-          false ->
-            undefined;
-          Dir ->
-            { ok, Dir ++ "/proc" }
-        end;
-      R ->
-        R
-    end,
+  { ok, MountPoint } = application:get_env (fuserlproc, mount_point),
   case application:get_env (fuserlproc, make_mount_point) of
     { ok, false } -> 
       ok;

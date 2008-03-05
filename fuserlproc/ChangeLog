@@ -1,3 +1,6 @@
+=Version 0.3.0=
+  * change application defaults.
+
 =Version 0.2.0=
   * set inodes for directories.
 

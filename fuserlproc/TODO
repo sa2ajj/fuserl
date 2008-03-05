@@ -1,5 +1,4 @@
 mnesia:system_info and mnesia:table_info
-current directory
 
 monitor pids and clean up state table
 monitor ports and clean up state table
