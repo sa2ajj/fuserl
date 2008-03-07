@@ -310,7 +310,22 @@ handle_cast (_Request, State) -> { noreply, State }.
 
 handle_info ({ 'EXIT', Port, Why },
              FusErlSrvState = #fuserlsrvstate{ port = Port }) ->
-  { stop, { port_exit, Why }, FusErlSrvState };
+  %% cheese ... create the fiction that the exit_status message
+  %% shows up first
+  %% what i really want is priority receive
+  receive
+    Msg={ Port, { exit_status, _ } } ->
+      case handle_info (Msg, FusErlSrvState) of
+        { noreply, NewState } ->
+          { stop, { port_exit, Why }, NewState };
+        { noreply, NewState, _ } ->
+          { stop, { port_exit, Why }, NewState };
+        R={ stop, _Reason, _NewState } ->
+          R
+      end
+  after 1000 ->
+    { stop, { port_exit, Why }, FusErlSrvState }
+  end;
 handle_info ({ Port, { data, Data } }, 
              FusErlSrvState = #fuserlsrvstate{ port = Port }) ->
   decode_request (Data, FusErlSrvState);

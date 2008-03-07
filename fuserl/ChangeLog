@@ -1,3 +1,6 @@
+Version 2.0.4:
+  * cheesily prioritize { Port, { exit_status, _ } } over { 'EXIT', Port, _ }
+
 Version 2.0.3:
   * Don't call port_close, unnecessary (happens automatically) and sometimes
   causes an error log (if terminate is due to port closing).
