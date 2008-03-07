@@ -1,3 +1,9 @@
+=Version 2.0.2=
+  * Handle POLLERR.
+
+=Version 2.0.1=
+  * Set poll timeout to handle race condition with signal.
+
 =Version 2.0.0=
   * Send fuse_ctx information to Erlang.
 

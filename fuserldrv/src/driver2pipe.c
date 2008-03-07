@@ -309,7 +309,7 @@ driver_to_pipe_main (char*              command,
           info.fds[i].revents = 0;
         }
 
-      if (poll (info.fds, nfds, -1) < 0)
+      if (poll (info.fds, nfds, 1000) < 0)
         {
           if (errno != EINTR)
             {
@@ -341,6 +341,18 @@ driver_to_pipe_main (char*              command,
             {
               fprintf (stderr, 
                        "fatal: poll got nval (%d) for file descriptor %d "
+                       "wanted: %d\n",
+                       info.fds[i].revents,
+                       info.fds[i].fd,
+                       info.fds[i].events);
+
+              goto STOP;
+            }
+
+          if (info.fds[i].revents & POLLERR)
+            {
+              fprintf (stderr, 
+                       "fatal: poll got err (%d) for file descriptor %d "
                        "wanted: %d\n",
                        info.fds[i].revents,
                        info.fds[i].fd,
