@@ -320,7 +320,7 @@ handle_info ({ 'EXIT', Port, Why },
           { stop, { port_exit, Why }, NewState };
         { noreply, NewState, _ } ->
           { stop, { port_exit, Why }, NewState };
-        R={ stop, _Reason, _NewState } ->
+        R = { stop, _Reason, _NewState } ->
           R
       end
   after 1000 ->
