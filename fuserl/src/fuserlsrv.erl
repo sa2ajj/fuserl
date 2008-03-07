@@ -330,11 +330,8 @@ handle_info (Msg, FusErlSrvState = #fuserlsrvstate{ module = Module,
 %% @hidden
 
 terminate (Reason, #fuserlsrvstate{ module = Module, 
-                                    port = Port,
                                     state = State }) ->
-  Module:terminate (Reason, State),
-
-  true = erlang:port_close (Port).
+  Module:terminate (Reason, State).
 
 % TODO: rescan module functions
 %% @hidden
@@ -552,7 +549,8 @@ make_port (false) ->
 
   open_port ({ spawn, Dir ++ "/bin/fuserldrv" }, [ binary, 
                                                    { packet, 4 },
-                                                   nouse_stdio ]);
+                                                   nouse_stdio,
+                                                   exit_status ]);
 make_port (true) ->
   { ok, Dir } = application:get_env (fuserl, fuserldrvprefix),
 
