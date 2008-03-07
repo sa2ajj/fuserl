@@ -242,14 +242,14 @@ driver_failure_eof (ErlDrvPort        port)
   return 0;
 }
 
-static volatile int exited = 0;
+static volatile int signalled = 0;
 
 static void
 handle_signal (int sig)
 {
   (void) sig;
 
-  exited = 1;
+  signalled = 1;
 }
 
 static void
@@ -274,6 +274,7 @@ setup_signal_handlers (void)
   sigdelset (&blocked, SIGSEGV);
   sigdelset (&blocked, SIGBUS);
   sigdelset (&blocked, SIGCONT);
+  sigdelset (&blocked, SIGSTOP);
 
   sigprocmask (SIG_SETMASK, &blocked, NULL);
 }
@@ -297,7 +298,7 @@ driver_to_pipe_main (char*              command,
   if (entry->init) { entry->init (); }
   d = entry->start ((void *) &info, command);
 
-  while (! exited)
+  while (! signalled)
     {
       nfds_t i;
       nfds_t nfds;
@@ -380,5 +381,5 @@ STOP:
 
   driver_free (info.fds);
 
-  return 0;
+  return signalled;
 }
