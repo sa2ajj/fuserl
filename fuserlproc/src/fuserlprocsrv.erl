@@ -2,7 +2,7 @@
 %% @end
 
 -module (fuserlprocsrv).
--export ([ start_link/2 ]).
+-export ([ start_link/2, start_link/3 ]).
 %-behaviour (fuserl).
 -export ([ code_change/3,
            handle_info/2,
@@ -29,7 +29,10 @@
 %-=====================================================================-
 
 start_link (LinkedIn, Dir) ->
-  fuserlsrv:start_link (?MODULE, LinkedIn, "allow_other,default_permissions", Dir, [], []).
+  start_link (LinkedIn, Dir, "").
+
+start_link (LinkedIn, Dir, MountOpts) ->
+  fuserlsrv:start_link (?MODULE, LinkedIn, MountOpts, Dir, [], []).
 
 %-=====================================================================-
 %-                           fuserl callbacks                          -
@@ -1056,6 +1059,7 @@ test_proc (LinkedIn) ->
 
       application:set_env (fuserlproc, linked_in, LinkedIn),
       application:set_env (fuserlproc, mount_point, Dir),
+      application:set_env (fuserlproc, mount_opts, ""),
       ok = application:start (fuserlproc),
       Dir
     end,

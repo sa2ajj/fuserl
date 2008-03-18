@@ -44,7 +44,8 @@ FW_PACKAGE_BUILD_CONFLICTS=""
 # erlang expression which evaluates to a list.
 FW_ERL_APP_ENVIRONMENT="[ { linked_in, false },
                           { make_mount_point, true },
-                          { mount_point, \"/erlproc\" } ]"
+                          { mount_point, \"/erlproc\" },
+                          { mount_opts, \"allow_other,default_permissions\" }]"
 
 # uncomment to add arbitrary extra content to the app file, e.g., an
 # included application directive.

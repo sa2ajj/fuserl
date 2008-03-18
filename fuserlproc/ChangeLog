@@ -1,5 +1,5 @@
-=Version 0.3.1=
-  * set 'allow_other' and 'default_permissions' options
+=Version 0.4.0=
+  * mount_opts app var, e.g., "allow_other, default_permissions" 
 
 =Version 0.3.0=
   * change application defaults.

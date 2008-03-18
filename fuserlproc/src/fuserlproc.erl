@@ -20,6 +20,7 @@ start () ->
 start (_Type, _Args) ->
   { ok, LinkedIn } = application:get_env (fuserlproc, linked_in),
   { ok, MountPoint } = application:get_env (fuserlproc, mount_point),
+  { ok, MountOpts } = application:get_env (fuserlproc, mount_opts),
   case application:get_env (fuserlproc, make_mount_point) of
     { ok, false } -> 
       ok;
@@ -32,7 +33,7 @@ start (_Type, _Args) ->
       end
   end,
 
-  fuserlprocsup:start_link (LinkedIn, MountPoint).
+  fuserlprocsup:start_link (LinkedIn, MountPoint, MountOpts).
 
 %% @hidden
 
