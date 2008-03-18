@@ -2,8 +2,6 @@
 %% @end
 
 -module (fuserlprocsrv).
--include_lib ("eunit/include/eunit.hrl").
--include_lib ("kernel/include/file.hrl").
 -export ([ start_link/2 ]).
 %-behaviour (fuserl).
 -export ([ code_change/3,
@@ -19,6 +17,11 @@
 
 -include_lib ("fuserl/include/fuserl.hrl").
 
+-ifdef (HAVE_EUNIT).
+-include_lib ("eunit/include/eunit.hrl").
+-include_lib ("kernel/include/file.hrl").
+-endif.
+
 -record (fuserlprocsrv, { inodes, names }).
 
 %-=====================================================================-
@@ -26,7 +29,7 @@
 %-=====================================================================-
 
 start_link (LinkedIn, Dir) ->
-  fuserlsrv:start_link (?MODULE, LinkedIn, "", Dir, [], []).
+  fuserlsrv:start_link (?MODULE, LinkedIn, "allow_other,default_permissions", Dir, [], []).
 
 %-=====================================================================-
 %-                           fuserl callbacks                          -
