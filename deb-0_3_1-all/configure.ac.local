@@ -1,7 +1,0 @@
-dnl -- include additional autoconf commands here
-dnl -- do not include AC_OUTPUT, this is called for you
-
-FW_TEMPLATE_ERLANG_CHECK_MODULE([eunit], ,
-                                [AC_MSG_WARN([need eunit to run tests])])
-
-AC_PREFIX_PROGRAM([fuserldrv])
