@@ -55,4 +55,4 @@ FW_ERL_PREREQ_APPLICATIONS_EXTRA="fuserl"
 
 FW_SUBVERSION_TAG_ROOT="https://fuserl.googlecode.com/svn/tags/fuserlproc"
 
-FW_DUPLOAD_ARGS=${FW_DUPLOAD_ARGS-"-t myarchive"}
+FW_DUPLOAD_ARGS=${FW_DUPLOAD_ARGS-"-t dukes"}
