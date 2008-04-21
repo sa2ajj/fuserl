@@ -378,7 +378,7 @@ readdir (_, 2, Size, Offset, _Fi, _, State) ->
          end
        end,
        { 0, Size },
-       lists:nthtail 
+       safe_nthtail
          (Offset,
           [ #direntry{ name = ".", offset = 1, stat = ?DIRATTR (2) },
             #direntry{ name = "..", offset = 2, stat = ?DIRATTR (1) } ] ++
@@ -417,7 +417,7 @@ readdir (_, 3, Size, Offset, _Fi, _, State) ->
          end
        end,
        { 0, Size },
-       lists:nthtail 
+       safe_nthtail 
          (Offset,
           [ #direntry{ name = ".", offset = 1, stat = ?DIRATTR (3) },
             #direntry{ name = "..", offset = 2, stat = ?DIRATTR (1) } ] ++
@@ -555,7 +555,7 @@ readdir (_, 6, Size, Offset, _Fi, _, State) ->
          end
        end,
        { 0, Size },
-       lists:nthtail 
+       safe_nthtail
          (Offset,
           [ #direntry{ name = ".", offset = 1, stat = ?DIRATTR (6) },
             #direntry{ name = "..", offset = 2, stat = ?DIRATTR (1) } ] ++
@@ -798,7 +798,7 @@ read_nodes_directory (Dot, Name, Size, Offset, State) ->
          end
        end,
        { 0, Size },
-       lists:nthtail 
+       safe_nthtail
          (Offset,
           [ #direntry{ name = ".", offset = 1, stat = ?DIRATTR (Dot) },
             #direntry{ name = "..", offset = 2, stat = ?DIRATTR (5) } ] ++
@@ -841,7 +841,7 @@ read_pid_directory (Dot, Name, Size, Offset, State) ->
          end
        end,
        { 0, Size },
-       lists:nthtail 
+       safe_nthtail
          (Offset,
           [ #direntry{ name = ".", offset = 1, stat = ?DIRATTR (Dot) },
             #direntry{ name = "..", offset = 2, stat = ?DIRATTR (3) } ] ++
@@ -884,7 +884,7 @@ read_port_directory (Dot, Name, Size, Offset, State) ->
          end
        end,
        { 0, Size },
-       lists:nthtail 
+       safe_nthtail 
          (Offset,
           [ #direntry{ name = ".", offset = 1, stat = ?DIRATTR (Dot) },
             #direntry{ name = "..", offset = 2, stat = ?DIRATTR (2) } ] ++
@@ -993,6 +993,17 @@ read_system_item (Name, Size, Offset, State) ->
     _ : _ ->
       { #fuse_reply_buf{ buf = <<>>, size = 0 }, State }
   end.
+
+% This may look like a cheat, but there are some cases where the entity
+% being indexed is changing (e.g., erlang:processes ()) and so 
+% readdir can crash between two lookups.
+
+safe_nthtail (_, []) -> 
+  [];
+safe_nthtail (N, L) when N =< 0 ->
+  L;
+safe_nthtail (N, L) ->
+  safe_nthtail (N - 1, tl (L)).
 
 system_item_attr (Name, State) ->
   { Ino, Item } = gb_trees:get ({ system_item, Name },

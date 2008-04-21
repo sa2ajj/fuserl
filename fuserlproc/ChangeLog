@@ -1,3 +1,6 @@
+=Version 0.4.1=
+  * guard against bad nthtail
+
 =Version 0.4.0=
   * mount_opts app var, e.g., "allow_other, default_permissions" 
 
