@@ -1,8 +1,12 @@
+/* I don't understand why these two functions need to redirected 
+ * and no others ... 
+ */
 #define driver_failure_posix driver_failure_posix_flass
 #define driver_failure_eof driver_failure_eof_flass
 #include <erl_driver.h>
 #undef driver_failure_posix
 #undef driver_failure_eof
+
 #include <errno.h>
 #include <poll.h>
 #include <signal.h>
