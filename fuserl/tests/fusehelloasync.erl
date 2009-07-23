@@ -158,10 +158,11 @@ test_hello (LinkedIn) ->
              10),
 
           { ok, FileInfo } = file:read_file_info (Dir ++ "/hello"),
-          FileInfo#file_info.size =:= size (?HELLO_STR),
-          FileInfo#file_info.type =:= regular,
-          (FileInfo#file_info.mode band 8#777) =:= 8#444,
-          FileInfo#file_info.links =:= 1,
+          Size = FileInfo#file_info.size,
+          Size = size (?HELLO_STR),
+          regular = FileInfo#file_info.type,
+          8#444 = (FileInfo#file_info.mode band 8#777),
+          1 = FileInfo#file_info.links,
 
           { ok, ?HELLO_STR } = file:read_file (Dir ++ "/hello"),
 

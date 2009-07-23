@@ -5,3 +5,4 @@ FW_TEMPLATE_ERLANG_CHECK_MODULE([eunit], ,
                                 [AC_MSG_WARN([need eunit to run tests])])
 
 AC_PREFIX_PROGRAM([fuserldrv])
+AC_CONFIG_FILES([src/fuserlprefix.hrl])

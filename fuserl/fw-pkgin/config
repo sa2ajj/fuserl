@@ -2,7 +2,7 @@
 # environment variable FW_PACKAGE_DEFAULT_MAINTAINER if non-empty
 
 FW_PACKAGE_NAME="fuserl"
-FW_PACKAGE_VERSION="2.0.4"
+FW_PACKAGE_VERSION="2.0.5"
 FW_PACKAGE_MAINTAINER="Paul Mineiro <paul-fw@mineiro.com>"
 FW_PACKAGE_SHORT_DESCRIPTION="Erlang FUSE binding Erlang code."
 FW_PACKAGE_DESCRIPTION="`cat README`"
@@ -42,7 +42,7 @@ FW_PACKAGE_BUILD_CONFLICTS=""
 
 # uncomment to define the application environment variables. should be an 
 # erlang expression which evaluates to a list.
-FW_ERL_APP_ENVIRONMENT="[ { fuserldrvprefix, \"/usr/\" } ]"
+FW_ERL_APP_ENVIRONMENT="[ { fuserldrvprefix, auto_detect } ]"
 
 # uncomment to add arbitrary extra content to the app file, e.g., an
 # included application directive.

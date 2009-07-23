@@ -18,6 +18,7 @@
            code_change/3]).
 
 -include ("fuserl.hrl").
+-include ("fuserlprefix.hrl").
 
 -record (fuserlsrvstate, { module, port, state }).
 
@@ -553,8 +554,22 @@ encode_start (Impl, MountOpts, MountPoint) ->
     fuserlcodec:encode_byte (erlang:length (Impl)),
     Impl ].
 
+fuserldrv_guessprefix () ->
+  lists:foldl (fun (Candidate, undefined) ->
+                 case file:read_file_info (Candidate ++ "/bin/fuserldrv") of
+                   { ok, _ } -> Candidate;
+                   { error, _ } -> undefined
+                 end;
+                   (_, Acc) ->
+                 Acc
+               end,
+               undefined,
+               [ ?automake_prefix, "/usr", "/usr/local", "/sw" ]).
+
 make_port (false) ->
-  { ok, Dir } = application:get_env (fuserl, fuserldrvprefix),
+  { ok, DirVar } = application:get_env (fuserl, fuserldrvprefix),
+
+  Dir = case DirVar of auto_detect -> fuserldrv_guessprefix (); _ -> DirVar end,
 
 %  open_port ({ spawn, "/usr/bin/valgrind --log-file=/tmp/flass --num-callers=50 --tool=memcheck --track-fds=yes --leak-check=yes --show-reachable=yes " ++ Dir ++ "/bin/fuserldrv" }, [ binary, 
 
@@ -567,7 +582,9 @@ make_port (false) ->
                                                    nouse_stdio,
                                                    exit_status ]);
 make_port (true) ->
-  { ok, Dir } = application:get_env (fuserl, fuserldrvprefix),
+  { ok, DirVar } = application:get_env (fuserl, fuserldrvprefix),
+
+  Dir = case DirVar of auto_detect -> fuserldrv_guessprefix (); _ -> DirVar end,
 
   case erl_ddll:load_driver (Dir ++ "/lib", libfuserl) of
     ok -> ok;

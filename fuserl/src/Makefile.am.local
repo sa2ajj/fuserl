@@ -4,6 +4,7 @@ dist_erlappsrc_DATA = 		\
   $(wildcard *.erl)
 
 dist_erlappinclude_DATA =	\
+  fuserlprefix.hrl		\
   $(wildcard *.hrl)
 
 erlappebin_SCRIPTS =					\
@@ -12,3 +13,6 @@ erlappebin_SCRIPTS =					\
 
 check_DATA =			\
   .dialyzer_ok
+
+MAINTAINERCLEANFILES +=		\
+  fuserlprefix.hrl
