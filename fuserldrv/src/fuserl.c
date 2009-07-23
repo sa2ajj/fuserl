@@ -1488,7 +1488,7 @@ fuserl_ready_input      (ErlDrvData     handle,
     {
       char byte;
 
-      write (d->filedes[0], &byte, 1);
+      (void) write (d->filedes[0], &byte, 1);
     }
 
   fuserl_debug ("fuserl_ready_input complete\n");
