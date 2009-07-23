@@ -834,6 +834,31 @@ fuserl_op_ ## name (fuse_req_t req,                                     \
   FUSE_OPERATION_FOOTER                                                 \
 }
 
+#define FUSE_OPERATION_IMPL_6(name, nameuc, type1, arg1, type2, arg2, type3, arg3, type4, arg4, type5, arg5, type6, arg6)   \
+static void                                                             \
+fuserl_op_ ## name (fuse_req_t req,                                     \
+                    type1 arg1,                                         \
+                    type2 arg2,                                         \
+                    type3 arg3,                                         \
+                    type4 arg4,                                         \
+                    type5 arg5,                                         \
+                    type6 arg6)                                         \
+{                                                                       \
+  FUSE_OPERATION_HEADER                                                 \
+                                                                        \
+  msg.data.request.op = FUSERL_ ## nameuc,                              \
+  msg.data.request.data.name.arg1 = arg1;                               \
+  msg.data.request.data.name.arg2 = arg2;                               \
+  msg.data.request.data.name.arg3 = arg3;                               \
+  msg.data.request.data.name.arg4 = arg4;                               \
+  msg.data.request.data.name.arg5 = arg5;                               \
+  msg.data.request.data.name.arg6 = arg6;                               \
+                                                                        \
+  FUSE_OPERATION_SEND                                                   \
+                                                                        \
+  FUSE_OPERATION_FOOTER                                                 \
+}
+
 FUSE_OPERATION_IMPL_2 (access, ACCESS,
                        fuse_ino_t, ino,
                        int, mask)
@@ -964,10 +989,18 @@ FUSE_OPERATION_IMPL_2 (unlink, UNLINK,
                        const char*, name)
 
 #if HAVE_SETXATTR
+#if (__FreeBSD__ >= 10)
+FUSE_OPERATION_IMPL_4 (getxattr, GETXATTR,
+                       fuse_ino_t, ino,
+                       const char*, name,
+                       size_t, size,
+                       uint32_t, position);     // NB: position is ignored
+#else
 FUSE_OPERATION_IMPL_3 (getxattr, GETXATTR,
                        fuse_ino_t, ino,
                        const char*, name,
                        size_t, size)
+#endif // (__FreeBSD__ >= 10)
 
 FUSE_OPERATION_IMPL_2 (listxattr, LISTXATTR,
                        fuse_ino_t, ino,
@@ -977,12 +1010,22 @@ FUSE_OPERATION_IMPL_2 (removexattr, REMOVEXATTR,
                        fuse_ino_t, ino,
                        const char*, name)
 
+#if (__FreeBSD__ >= 10)
+FUSE_OPERATION_IMPL_6 (setxattr, SETXATTR,
+                       fuse_ino_t, ino,
+                       const char*, name,
+                       const char*, value,
+                       size_t, size,
+                       int, flags,
+                       uint32_t, position)      // NB: position is ignored
+#else
 FUSE_OPERATION_IMPL_5 (setxattr, SETXATTR,
                        fuse_ino_t, ino,
                        const char*, name,
                        const char*, value,
                        size_t, size,
                        int, flags)
+#endif // (__FreeBSD__ >= 10)
 #endif
 
 static void

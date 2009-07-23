@@ -1,5 +1,6 @@
 =Version 2.0.3= [ NYR ]
   * jaunty compilation warnings fix (?)
+  * darwin/freebsd compilation fixes
 
 =Version 2.0.2=
   * Distinguish between signal termination and all other terminations.

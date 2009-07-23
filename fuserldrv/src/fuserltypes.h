@@ -231,6 +231,9 @@ struct _FusErlRequestLL
           fuse_ino_t                    ino;
           const char*                   name;
           size_t                        size;
+#if (__FreeBSD__ >= 10)
+          uint32_t                      position;       // NB: unused (!)
+#endif
         }                                       getxattr;
 
       struct
@@ -324,6 +327,9 @@ struct _FusErlRequestLL
           const char*                   value;
           size_t                        size;
           int                           flags;
+#if (__FreeBSD__ >= 10)
+          uint32_t                      position;       // NB: unused (!)
+#endif
         }                                       setxattr;
 
       struct
