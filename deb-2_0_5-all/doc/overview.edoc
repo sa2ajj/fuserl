@@ -1,0 +1,4 @@
+@author Paul Mineiro
+@copyright 2007 Paul Mineiro, released under new BSD License
+@title FusErl
+@doc Erlang interface to FUSE (Filesystem in User SpacE).

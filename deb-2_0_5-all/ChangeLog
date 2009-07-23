@@ -1,0 +1,32 @@
+Version 2.0.5:
+  * autodetect fuserldrvprefix by default
+
+Version 2.0.4:
+  * cheesily prioritize { Port, { exit_status, _ } } over { 'EXIT', Port, _ }
+
+Version 2.0.3:
+  * Don't call port_close, unnecessary (happens automatically) and sometimes
+  causes an error log (if terminate is due to port closing).
+  * use exit_status (for linked_in=false).  
+
+Version 2.0.2:
+  * Have encode_string work with iolists.
+  * Fix dirent_size to agree with include/fuse_kernel.h
+
+Version 2.0.1:
+  * Have encode_string take binaries.
+
+Version 2.0.0:
+  * Include fuse context in callbacks.
+
+Version 1.0.1:
+  * Fix 'make dist'
+
+Version 1.0.0:
+  * Switch to low-level interface (fuserldrv 1.0.0).
+
+Version 0.0.1:
+  * Darwin test fixes (wait for mount).
+
+Version 0.0.0:
+  * Initial version.
