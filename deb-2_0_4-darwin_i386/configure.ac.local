@@ -1,0 +1,65 @@
+dnl -- include additional autoconf commands here
+dnl -- do not include AC_OUTPUT, this is called for you
+
+AC_SYS_LARGEFILE
+
+# we have to play some weird games here since many people will be
+# using MacFuse from the installer pkg and not from fink
+
+FW_TEMPLATE_C_SETUP_PKGCONFIG
+
+case "$FW_PKGCONFIG_PREREQS_LIBS" in
+  *-lfuse*)
+    FUSE_CFLAGS=""
+    FUSE_LIBS=""
+    FW_SUBST_PROTECT([FUSE_CFLAGS])
+    FW_SUBST_PROTECT([FUSE_LIBS])
+    ;;
+  *)
+    PKG_CHECK_MODULES([FUSE], [fuse], ,
+                      [AC_MSG_ERROR([pkg-config of fuse failed: $FUSE_PKG_ERRORS])])
+    ;;
+esac
+
+save_cflags="$CFLAGS"
+
+CFLAGS="$CFLAGS $FW_PKGCONFIG_PREREQS_CFLAGS $FUSE_CFLAGS"
+
+AC_CHECK_MEMBER([struct fuse_file_info.flush], , 
+                [AC_MSG_ERROR([ fuse version 2.6 or higher required ])],
+                [#define _FILE_OFFSET_BITS 64 /* fuse_common.h requires this */
+                 #define FUSE_USE_VERSION 26
+                 #include <fuse.h>])
+
+CFLAGS="$save_cflags"
+
+# and some people will be using fink ...
+
+test -d "/sw/lib/erlang/usr/include/" && {
+  CPPFLAGS="$CPPFLAGS -I/sw/lib/erlang/usr/include/"
+}
+
+# freebsd7 ...
+
+test -d "/usr/local/lib/erlang/usr/include/" && {
+  CPPFLAGS="$CPPFLAGS -I/usr/local/lib/erlang/usr/include/"
+}
+
+AC_CHECK_HEADERS([limits.h sys/param.h sys/xattr.h])
+AC_CHECK_FUNCS([unmount setxattr])
+
+AC_CHECK_HEADERS([erl_driver.h], ,
+                 [AC_MSG_ERROR([ need erl_driver.h to proceed ])])
+
+case "$host_os" in
+  darwin*)
+    AC_DEFINE([DARWIN_TWEAKS], 1, [define if compiling for darwin (macfuse)])
+    ;;
+  linux*)
+    ;;
+  freebsd7*)
+    ;;
+  *)
+    AC_WARN([untested os '$host_os' detected, good luck!])
+    ;;
+esac
