@@ -1,5 +1,0 @@
-Erlang bindings for FUSE (Filesystem in UserspacE).  Currently the
-low-level FUSE interface is supported.
-
-This is the architecture-dependent part (C driver).  There is also
-an architecture-independent part (Erlang code) provided by another package.
